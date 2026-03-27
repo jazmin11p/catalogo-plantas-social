@@ -3,7 +3,7 @@ import { auth, provider, db } from "./firebase";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import {
   collection, doc, setDoc, getDoc, getDocs, deleteDoc,
-  query, where, orderBy, serverTimestamp
+  query, where, serverTimestamp
 } from "firebase/firestore";
 
 // ── Constants ─────────────────────────────────────────
@@ -315,7 +315,7 @@ function CommunityView({ currentUser, onCopy }) {
   const loadUserPlants = async(user)=>{
     setSelectedUser(user); setLoadingPlants(true); setUserPlants([]);
     try {
-      const q = query(collection(db,"plants"),where("userId","==",user.uid),orderBy("createdAt","desc"));
+      const q = query(collection(db,"plants"),where("userId","==",user.uid));
       const snap = await getDocs(q);
       setUserPlants(snap.docs.map(d=>({id:d.id,...d.data()})));
     } catch(e){ console.error(e); }
@@ -412,7 +412,7 @@ export default function App() {
 
   const loadPlants = async(uid)=>{
     try {
-      const q = query(collection(db,"plants"),where("userId","==",uid),orderBy("createdAt","desc"));
+      const q = query(collection(db,"plants"),where("userId","==",user.uid));
       const snap = await getDocs(q);
       setPlants(snap.docs.map(d=>({id:d.id,...d.data()})));
     } catch(e){ console.error(e); }
