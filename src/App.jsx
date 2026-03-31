@@ -623,36 +623,99 @@ function GlossaryPanel({ onClose }) {
 
 // ── Community ──────────────────────────────────────────
 function CommunityView({ currentUser, onCopy }) {
-  const [users, setUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [userPlants, setUserPlants] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(true);
-  const [loadingPlants, setLoadingPlants] = useState(false);
+  const [allPlants, setAllPlants] = useState([]);
+  const [usersMap, setUsersMap] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [activeTag, setActiveTag] = useState(null);
   const [selectedPlant, setSelectedPlant] = useState(null);
-  useEffect(()=>{ (async()=>{ try { const snap=await getDocs(collection(db,"users")); setUsers(snap.docs.map(d=>d.data()).filter(u=>u.uid!==currentUser.uid)); } catch(e){console.error(e);} setLoadingUsers(false); })(); },[]);
-  const loadUserPlants = async user=>{ setSelectedUser(user); setLoadingPlants(true); setUserPlants([]); try { const q=query(collection(db,"plants"),where("userId","==",user.uid)); const snap=await getDocs(q); setUserPlants(snap.docs.map(d=>({id:d.id,...d.data()}))); } catch(e){console.error(e);} setLoadingPlants(false); };
+
+  useEffect(()=>{
+    (async()=>{
+      try {
+        // Load all users
+        const usersSnap = await getDocs(collection(db,"users"));
+        const map = {};
+        usersSnap.docs.forEach(d=>{ map[d.data().uid]=d.data(); });
+        setUsersMap(map);
+        // Load all plants except own
+        const plantsSnap = await getDocs(collection(db,"plants"));
+        const plants = plantsSnap.docs
+          .map(d=>({id:d.id,...d.data()}))
+          .filter(p=>p.userId !== currentUser.uid);
+        setAllPlants(plants);
+      } catch(e){ console.error(e); }
+      setLoading(false);
+    })();
+  },[]);
+
+  const allTags = [...new Set(allPlants.flatMap(p=>p.gardenTags||[]))];
+
+  const filtered = allPlants.filter(p=>{
+    const ms = !search ||
+      p.commonName?.toLowerCase().includes(search.toLowerCase()) ||
+      p.scientificName?.toLowerCase().includes(search.toLowerCase());
+    const mt = !activeTag || p.gardenTags?.includes(activeTag);
+    return ms && mt;
+  });
+
   return (
     <div style={{maxWidth:"1100px",margin:"0 auto",padding:"28px 24px"}}>
-      {!selectedUser?(
-        <>
-          <h2 style={{color:C.text,fontFamily:font.serif,fontSize:"24px",margin:"0 0 22px"}}>Colecciones de la comunidad 🌍</h2>
-          {loadingUsers?<div style={{display:"flex",justifyContent:"center",padding:"60px"}}><Spinner/></div>
-          :users.length===0?(<div style={{textAlign:"center",padding:"80px 20px"}}><div style={{fontSize:"56px",opacity:0.2,marginBottom:"16px"}}>👥</div><p style={{color:C.green,fontFamily:font.serif,fontSize:"20px"}}>Aún no hay más personas</p><p style={{color:C.textLight,fontFamily:font.body,fontSize:"14px"}}>Comparte el enlace con tus amigas para que se unan</p></div>)
-          :(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:"14px"}}>{users.map(u=>(<div key={u.uid} onClick={()=>loadUserPlants(u)} style={{background:C.bgCard,border:`0.5px solid ${C.border}`,borderRadius:"14px",padding:"20px",cursor:"pointer",textAlign:"center",transition:"transform 0.2s,box-shadow 0.2s",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.12)";}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 2px 12px rgba(0,0,0,0.06)"}}><img src={u.photoURL||"https://api.dicebear.com/7.x/thumbs/svg?seed="+u.uid} style={{width:"52px",height:"52px",borderRadius:"50%",border:`0.5px solid ${C.border}`,marginBottom:"10px"}} alt={u.displayName}/><p style={{margin:"0 0 4px",color:C.text,fontFamily:font.serif,fontSize:"14px",fontWeight:600}}>{u.displayName||"Usuaria"}</p><p style={{margin:0,color:C.textLight,fontFamily:font.body,fontSize:"12px"}}>{u.plantCount||0} plantas</p></div>))}</div>)}
-        </>
-      ):(
-        <>
-          <button onClick={()=>{setSelectedUser(null);setUserPlants([]);}} style={{display:"inline-flex",alignItems:"center",gap:"8px",padding:"8px 16px",background:C.bg,color:C.textMid,border:`0.5px solid ${C.border}`,borderRadius:"10px",fontFamily:font.body,fontSize:"13px",cursor:"pointer",marginBottom:"20px"}}>← Volver</button>
-          <div style={{display:"flex",alignItems:"center",gap:"14px",marginBottom:"24px"}}>
-            <img src={selectedUser.photoURL} style={{width:"44px",height:"44px",borderRadius:"50%",border:`0.5px solid ${C.border}`}} alt={selectedUser.displayName}/>
-            <div><p style={{color:C.textLight,fontFamily:font.body,fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.15em",margin:0}}>Colección de</p><h2 style={{color:C.text,fontFamily:font.serif,fontSize:"20px",margin:"2px 0 0"}}>{selectedUser.displayName}</h2></div>
+      <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:"12px",marginBottom:"20px",flexWrap:"wrap"}}>
+        <div>
+          <h2 style={{color:C.text,fontFamily:font.serif,fontSize:"24px",margin:"0 0 4px"}}>Comunidad 🌍</h2>
+          <p style={{color:C.textLight,fontFamily:font.body,fontSize:"14px",margin:0}}>{allPlants.length} plantas compartidas</p>
+        </div>
+      </div>
+
+      {/* Search + tag filters */}
+      <div style={{background:"#fff",border:`0.5px solid ${C.border}`,borderRadius:"12px",padding:"14px 16px",marginBottom:"20px"}}>
+        <div style={{position:"relative",marginBottom:"12px"}}>
+          <span style={{position:"absolute",left:"12px",top:"50%",transform:"translateY(-50%)",color:C.textLight}}>🔍</span>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar planta en toda la comunidad..."
+            style={{width:"100%",padding:"9px 14px 9px 38px",background:C.bg,border:`0.5px solid ${C.border}`,borderRadius:"8px",color:C.text,fontFamily:font.body,fontSize:"14px",outline:"none",boxSizing:"border-box"}}/>
+        </div>
+        {allTags.length>0&&(
+          <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+            <TagChip label="Todas" active={!activeTag} onClick={()=>setActiveTag(null)}/>
+            {allTags.map(tag=><TagChip key={tag} label={tag} active={activeTag===tag} onClick={()=>setActiveTag(activeTag===tag?null:tag)}/>)}
           </div>
-          {loadingPlants?<div style={{display:"flex",justifyContent:"center",padding:"60px"}}><Spinner/></div>
-          :userPlants.length===0?<div style={{textAlign:"center",padding:"60px"}}><p style={{color:C.green,fontFamily:font.serif,fontSize:"18px"}}>Esta colección está vacía</p></div>
-          :<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:"14px"}}>{userPlants.map(plant=><PlantCard key={plant.id} plant={plant} onClick={setSelectedPlant} onCopy={onCopy} isOwn={false}/>)}</div>}
-          {selectedPlant&&<DetailModal plant={selectedPlant} onClose={()=>setSelectedPlant(null)} onCopy={p=>{onCopy(p);setSelectedPlant(null);}} isOwn={false}/>}
-        </>
+        )}
+      </div>
+
+      {loading ? (
+        <div style={{display:"flex",justifyContent:"center",padding:"60px"}}><Spinner/></div>
+      ) : allPlants.length===0 ? (
+        <div style={{textAlign:"center",padding:"80px 20px"}}>
+          <div style={{fontSize:"56px",opacity:0.2,marginBottom:"16px"}}>👥</div>
+          <p style={{color:C.green,fontFamily:font.serif,fontSize:"20px"}}>Aún no hay más personas</p>
+          <p style={{color:C.textLight,fontFamily:font.body,fontSize:"14px"}}>Comparte el enlace con tus amigas para que se unan</p>
+        </div>
+      ) : filtered.length===0 ? (
+        <div style={{textAlign:"center",padding:"60px"}}>
+          <p style={{color:C.green,fontFamily:font.serif,fontSize:"18px"}}>No se encontraron plantas</p>
+          <p style={{color:C.textLight,fontFamily:font.body,fontSize:"14px"}}>Intenta con otro nombre o etiqueta</p>
+        </div>
+      ) : (
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(210px,1fr))",gap:"16px"}}>
+          {filtered.map(plant=>{
+            const owner = usersMap[plant.userId];
+            return (
+              <div key={plant.id}>
+                {owner&&(
+                  <div style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"6px",paddingLeft:"2px"}}>
+                    <img src={owner.photoURL||"https://api.dicebear.com/7.x/thumbs/svg?seed="+owner.uid} style={{width:"20px",height:"20px",borderRadius:"50%",border:`0.5px solid ${C.border}`}} alt={owner.displayName}/>
+                    <span style={{color:C.textLight,fontFamily:font.body,fontSize:"11px"}}>{owner.displayName?.split(" ")[0]}</span>
+                  </div>
+                )}
+                <PlantCard plant={plant} onClick={setSelectedPlant} onCopy={onCopy} isOwn={false}/>
+              </div>
+            );
+          })}
+        </div>
       )}
+
+      {selectedPlant&&<DetailModal plant={selectedPlant} onClose={()=>setSelectedPlant(null)} onCopy={p=>{onCopy(p);setSelectedPlant(null);}} isOwn={false}/>}
     </div>
   );
 }
