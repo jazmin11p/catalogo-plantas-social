@@ -720,6 +720,260 @@ function CommunityView({ currentUser, onCopy }) {
   );
 }
 
+// ── Projects View ──────────────────────────────────────
+const emptyProject = { name:"", location:"", notes:"", photo:"", isPublic:false, plantIds:[] };
+
+function ProjectForm({ initial, myPlants, onSave, onCancel }) {
+  const [form, setForm] = useState(initial || emptyProject);
+  const [tab, setTab] = useState("info");
+  const fileRef = useRef();
+  const set = (f,v) => setForm(p=>({...p,[f]:v}));
+  const togglePlant = id => setForm(p=>({ ...p, plantIds: p.plantIds.includes(id) ? p.plantIds.filter(x=>x!==id) : [...p.plantIds, id] }));
+  const handlePhoto = e => { const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>set("photo",ev.target.result); r.readAsDataURL(f); };
+  const inp = {width:"100%",padding:"10px 12px",background:C.bg,border:`0.5px solid ${C.border}`,borderRadius:"8px",color:C.text,fontFamily:font.body,fontSize:"14px",boxSizing:"border-box",outline:"none"};
+  const lbl = {display:"block",color:C.textLight,fontFamily:font.body,fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"6px"};
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(44,48,32,0.55)",backdropFilter:"blur(4px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}}>
+      <div style={{background:C.bgCard,border:`0.5px solid ${C.border}`,borderRadius:"20px",width:"100%",maxWidth:"580px",maxHeight:"92vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.15)",padding:"28px"}}>
+        <h2 style={{color:C.text,fontFamily:font.serif,fontSize:"22px",margin:"0 0 20px"}}>{initial?"Editar proyecto":"Nuevo proyecto"}</h2>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:"4px",marginBottom:"20px",borderBottom:`0.5px solid ${C.border}`}}>
+          {[["info","Información"],["plants","Plantas"]].map(([t,l])=>(
+            <button key={t} onClick={()=>setTab(t)} style={{padding:"8px 16px",background:tab===t?C.greenPale:"transparent",color:tab===t?C.greenText:C.textLight,border:"none",borderRadius:"8px 8px 0 0",fontFamily:font.body,fontSize:"13px",cursor:"pointer",borderBottom:tab===t?`2px solid ${C.green}`:"2px solid transparent"}}>{l} {t==="plants"?`(${form.plantIds.length})`:""}</button>
+          ))}
+        </div>
+
+        {tab==="info"&&(
+          <>
+            {/* Photo */}
+            <div style={{marginBottom:"18px"}}>
+              <label style={lbl}>Foto de referencia / inspiración</label>
+              <div style={{height:"160px",borderRadius:"12px",border:form.photo?`0.5px solid ${C.border}`:`2px dashed ${C.border}`,background:C.bg,overflow:"hidden",position:"relative",display:"flex",alignItems:"center",justifyContent:"center",cursor:form.photo?"default":"pointer"}} onClick={()=>!form.photo&&fileRef.current.click()}>
+                {form.photo
+                  ? <><img src={form.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="ref"/>
+                      <div style={{position:"absolute",bottom:0,left:0,right:0,background:"rgba(240,236,224,0.9)",padding:"8px 12px",display:"flex",gap:"8px"}}>
+                        <button onClick={e=>{e.stopPropagation();fileRef.current.click();}} style={{flex:1,padding:"5px",background:C.green,color:"#fff",border:"none",borderRadius:"6px",fontFamily:font.body,fontSize:"12px",cursor:"pointer"}}>Cambiar</button>
+                        <button onClick={e=>{e.stopPropagation();set("photo","");}} style={{padding:"5px 10px",background:"#f0e0d8",color:"#a05050",border:`0.5px solid #d4b8b8`,borderRadius:"6px",fontFamily:font.body,fontSize:"12px",cursor:"pointer"}}>✕</button>
+                      </div></>
+                  : <div style={{textAlign:"center"}}><div style={{fontSize:"26px",opacity:0.3}}>🖼️</div><p style={{color:C.textLight,fontFamily:font.body,fontSize:"12px",margin:"4px 0 0"}}>Agregar foto de referencia</p></div>}
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{display:"none"}}/>
+            </div>
+
+            <div style={{marginBottom:"14px"}}><label style={lbl}>Nombre del proyecto</label><input style={inp} value={form.name} onChange={e=>set("name",e.target.value)} placeholder="Ej: Jardín frontal casa nueva"/></div>
+            <div style={{marginBottom:"14px"}}><label style={lbl}>Ubicación / contexto</label><input style={inp} value={form.location} onChange={e=>set("location",e.target.value)} placeholder="Ej: Terraza norte, jardín trasero, balcón..."/></div>
+            <div style={{marginBottom:"20px"}}><label style={lbl}>Notas y combinaciones</label><textarea style={{...inp,minHeight:"90px",resize:"vertical"}} value={form.notes} onChange={e=>set("notes",e.target.value)} placeholder="Ideas, combinaciones posibles, paleta de colores, condiciones del espacio..."/></div>
+
+            {/* Visibility toggle */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",background:C.bg,borderRadius:"10px",border:`0.5px solid ${C.border}`,marginBottom:"24px"}}>
+              <div>
+                <p style={{margin:"0 0 2px",color:C.text,fontFamily:font.body,fontSize:"14px",fontWeight:500}}>{form.isPublic?"Proyecto público":"Proyecto privado"}</p>
+                <p style={{margin:0,color:C.textLight,fontFamily:font.body,fontSize:"12px"}}>{form.isPublic?"Visible para toda la comunidad":"Solo tú lo puedes ver"}</p>
+              </div>
+              <div onClick={()=>set("isPublic",!form.isPublic)} style={{width:"44px",height:"24px",borderRadius:"12px",background:form.isPublic?C.green:C.border,position:"relative",cursor:"pointer",transition:"background 0.2s",flexShrink:0}}>
+                <div style={{position:"absolute",top:"3px",left:form.isPublic?"22px":"3px",width:"18px",height:"18px",borderRadius:"50%",background:"#fff",transition:"left 0.2s",boxShadow:"0 1px 4px rgba(0,0,0,0.2)"}}/>
+              </div>
+            </div>
+          </>
+        )}
+
+        {tab==="plants"&&(
+          <div>
+            <p style={{color:C.textLight,fontFamily:font.body,fontSize:"13px",margin:"0 0 14px"}}>Selecciona las plantas que usarás en este proyecto:</p>
+            {myPlants.length===0
+              ? <p style={{color:C.textLight,fontFamily:font.body,fontSize:"14px",textAlign:"center",padding:"40px"}}>No tienes plantas en tu biblioteca aún.</p>
+              : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:"10px"}}>
+                  {myPlants.map(p=>{
+                    const selected = form.plantIds.includes(p.id);
+                    return (
+                      <div key={p.id} onClick={()=>togglePlant(p.id)} style={{borderRadius:"10px",overflow:"hidden",border:selected?`2px solid ${C.green}`:`0.5px solid ${C.border}`,cursor:"pointer",transition:"all 0.15s",boxShadow:selected?`0 0 0 3px ${C.greenPale}`:"none"}}>
+                        <div style={{height:"80px",background:C.greenPale,position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {p.photo?<img src={p.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={p.commonName}/>:<span style={{fontSize:"28px",opacity:0.3}}>🌿</span>}
+                          {selected&&<div style={{position:"absolute",top:"5px",right:"5px",width:"18px",height:"18px",borderRadius:"50%",background:C.green,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"#fff",fontSize:"11px",fontWeight:"bold"}}>✓</span></div>}
+                        </div>
+                        <div style={{padding:"6px 8px",background:selected?C.greenPale:"#fff"}}>
+                          <p style={{margin:0,color:selected?C.greenText:C.text,fontFamily:font.body,fontSize:"11px",fontWeight:500,lineHeight:1.2}}>{p.commonName||"Sin nombre"}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+            }
+            <div style={{marginTop:"16px",padding:"10px 14px",background:C.greenPale,borderRadius:"8px",border:`0.5px solid ${C.green}`}}>
+              <p style={{margin:0,color:C.greenText,fontFamily:font.body,fontSize:"13px"}}>{form.plantIds.length} {form.plantIds.length===1?"planta seleccionada":"plantas seleccionadas"}</p>
+            </div>
+          </div>
+        )}
+
+        <div style={{display:"flex",gap:"10px",marginTop:"8px"}}>
+          <button onClick={()=>onSave(form)} style={{flex:1,padding:"12px",background:C.green,color:"#fff",border:"none",borderRadius:"10px",fontFamily:font.serif,fontSize:"15px",cursor:"pointer"}}>{initial?"Guardar cambios":"Crear proyecto"}</button>
+          <button onClick={onCancel} style={{padding:"12px 18px",background:C.bg,color:C.textMid,border:`0.5px solid ${C.border}`,borderRadius:"10px",fontFamily:font.body,fontSize:"14px",cursor:"pointer"}}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProjectsView({ user, myPlants, showToast }) {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [selectedProject, setSelectedProject] = useState(null);
+
+  const loadProjects = async () => {
+    try {
+      const q = query(collection(db,"projects"), where("userId","==",user.uid));
+      const snap = await getDocs(q);
+      setProjects(snap.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e){ console.error(e); }
+    setLoading(false);
+  };
+
+  useEffect(()=>{ loadProjects(); },[]);
+
+  const handleSave = async form => {
+    if(!form.name.trim()) return;
+    try {
+      if(editingProject){
+        await setDoc(doc(db,"projects",editingProject.id),{...form,userId:user.uid,updatedAt:serverTimestamp()},{merge:true});
+      } else {
+        const ref = doc(collection(db,"projects"));
+        await setDoc(ref,{...form,id:ref.id,userId:user.uid,createdAt:serverTimestamp()});
+      }
+      await loadProjects();
+      showToast(editingProject?"Proyecto actualizado ✓":"Proyecto creado ✓");
+    } catch(e){ console.error(e); showToast("Error al guardar"); }
+    setShowForm(false); setEditingProject(null);
+  };
+
+  const handleDelete = async id => {
+    try { await deleteDoc(doc(db,"projects",id)); await loadProjects(); showToast("Proyecto eliminado"); }
+    catch(e){ console.error(e); }
+    setSelectedProject(null);
+  };
+
+  // Build plant lookup
+  const plantMap = {};
+  myPlants.forEach(p=>{ plantMap[p.id]=p; });
+
+  if(loading) return <div style={{display:"flex",justifyContent:"center",padding:"80px"}}><Spinner/></div>;
+
+  return (
+    <div style={{maxWidth:"1100px",margin:"0 auto",padding:"28px 24px"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"12px",marginBottom:"24px",flexWrap:"wrap"}}>
+        <div>
+          <h2 style={{color:C.text,fontFamily:font.serif,fontSize:"24px",margin:"0 0 4px"}}>Mis proyectos 📋</h2>
+          <p style={{color:C.textLight,fontFamily:font.body,fontSize:"14px",margin:0}}>{projects.length} {projects.length===1?"proyecto":"proyectos"}</p>
+        </div>
+        <button onClick={()=>{setEditingProject(null);setShowForm(true);}} style={{padding:"9px 18px",background:C.green,color:"#fff",border:"none",borderRadius:"8px",fontFamily:font.serif,fontSize:"14px",cursor:"pointer",boxShadow:`0 2px 8px ${C.green}44`}}>+ Nuevo proyecto</button>
+      </div>
+
+      {projects.length===0 ? (
+        <div style={{textAlign:"center",padding:"80px 20px"}}>
+          <div style={{fontSize:"56px",opacity:0.2,marginBottom:"16px"}}>📋</div>
+          <p style={{color:C.green,fontFamily:font.serif,fontSize:"20px"}}>Sin proyectos aún</p>
+          <p style={{color:C.textLight,fontFamily:font.body,fontSize:"14px"}}>Crea tu primer proyecto para organizar combinaciones de plantas</p>
+        </div>
+      ) : (
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:"16px"}}>
+          {projects.map(proj=>{
+            const projPlants = (proj.plantIds||[]).map(id=>plantMap[id]).filter(Boolean);
+            return (
+              <div key={proj.id} onClick={()=>setSelectedProject(proj)} style={{background:C.bgCard,border:`0.5px solid ${C.border}`,borderRadius:"16px",overflow:"hidden",cursor:"pointer",transition:"transform 0.2s,box-shadow 0.2s",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}
+                onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow="0 8px 24px rgba(0,0,0,0.12)";}}
+                onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 2px 12px rgba(0,0,0,0.06)";}}>
+                {/* Cover photo or plant mosaic */}
+                <div style={{height:"140px",background:C.greenPale,position:"relative",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  {proj.photo
+                    ? <img src={proj.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={proj.name}/>
+                    : projPlants.length>0
+                      ? <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(projPlants.length,3)},1fr)`,width:"100%",height:"100%"}}>
+                          {projPlants.slice(0,3).map(p=>(
+                            <div key={p.id} style={{overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",background:C.greenPale}}>
+                              {p.photo?<img src={p.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={p.commonName}/>:<span style={{fontSize:"28px",opacity:0.3}}>🌿</span>}
+                            </div>
+                          ))}
+                        </div>
+                      : <span style={{fontSize:"36px",opacity:0.25}}>📋</span>}
+                  {/* Public/private badge */}
+                  <div style={{position:"absolute",top:"8px",right:"8px",padding:"3px 9px",borderRadius:"999px",background:"rgba(255,255,255,0.9)",border:`0.5px solid ${C.border}`}}>
+                    <span style={{color:proj.isPublic?C.green:C.textLight,fontFamily:font.body,fontSize:"10px"}}>{proj.isPublic?"🌐 Público":"🔒 Privado"}</span>
+                  </div>
+                </div>
+                <div style={{padding:"14px 16px"}}>
+                  <h3 style={{margin:"0 0 4px",color:C.text,fontFamily:font.serif,fontSize:"16px",fontWeight:600}}>{proj.name||"Sin nombre"}</h3>
+                  {proj.location&&<p style={{margin:"0 0 8px",color:C.green,fontFamily:font.body,fontSize:"12px"}}>📍 {proj.location}</p>}
+                  {proj.notes&&<p style={{margin:"0 0 10px",color:C.textMid,fontFamily:font.body,fontSize:"12px",lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{proj.notes}</p>}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span style={{color:C.textLight,fontFamily:font.body,fontSize:"12px"}}>🌿 {projPlants.length} {projPlants.length===1?"planta":"plantas"}</span>
+                    <div style={{display:"flex",gap:"-6px"}}>
+                      {projPlants.slice(0,4).map((p,i)=>(
+                        <div key={p.id} style={{width:"22px",height:"22px",borderRadius:"50%",border:`2px solid #fff`,overflow:"hidden",marginLeft:i>0?"-6px":"0",background:C.greenPale,display:"inline-block"}}>
+                          {p.photo?<img src={p.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:<span style={{fontSize:"10px",lineHeight:"18px",display:"block",textAlign:"center"}}>🌿</span>}
+                        </div>
+                      ))}
+                      {projPlants.length>4&&<div style={{width:"22px",height:"22px",borderRadius:"50%",border:`2px solid #fff`,background:C.green,display:"inline-flex",alignItems:"center",justifyContent:"center",marginLeft:"-6px"}}><span style={{color:"#fff",fontSize:"9px",fontFamily:font.body}}>+{projPlants.length-4}</span></div>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Project detail modal */}
+      {selectedProject&&(()=>{
+        const proj = selectedProject;
+        const projPlants = (proj.plantIds||[]).map(id=>plantMap[id]).filter(Boolean);
+        return (
+          <div style={{position:"fixed",inset:0,background:"rgba(44,48,32,0.6)",backdropFilter:"blur(4px)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}} onClick={()=>setSelectedProject(null)}>
+            <div onClick={e=>e.stopPropagation()} style={{background:C.bgCard,border:`0.5px solid ${C.border}`,borderRadius:"20px",width:"100%",maxWidth:"620px",maxHeight:"90vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.15)"}}>
+              {proj.photo&&<div style={{height:"220px",overflow:"hidden",borderRadius:"20px 20px 0 0"}}><img src={proj.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={proj.name}/></div>}
+              <div style={{padding:"24px"}}>
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:"12px",marginBottom:"6px"}}>
+                  <h2 style={{margin:0,color:C.text,fontFamily:font.serif,fontSize:"24px",fontWeight:600}}>{proj.name}</h2>
+                  <span style={{padding:"3px 10px",borderRadius:"999px",background:proj.isPublic?C.greenPale:C.bg,color:proj.isPublic?C.greenText:C.textLight,border:`0.5px solid ${proj.isPublic?C.green:C.border}`,fontFamily:font.body,fontSize:"11px",flexShrink:0,marginTop:"4px"}}>{proj.isPublic?"🌐 Público":"🔒 Privado"}</span>
+                </div>
+                {proj.location&&<p style={{margin:"0 0 14px",color:C.green,fontFamily:font.body,fontSize:"13px"}}>📍 {proj.location}</p>}
+                {proj.notes&&<div style={{marginBottom:"20px"}}><p style={{color:C.textLight,fontFamily:font.body,fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.1em",margin:"0 0 8px"}}>Notas y combinaciones</p><p style={{color:C.textMid,fontFamily:font.body,fontSize:"14px",lineHeight:1.7,margin:0,background:C.bg,padding:"12px 14px",borderRadius:"10px",border:`0.5px solid ${C.border}`}}>{proj.notes}</p></div>}
+
+                <p style={{color:C.textLight,fontFamily:font.body,fontSize:"11px",textTransform:"uppercase",letterSpacing:"0.1em",margin:"0 0 12px"}}>Plantas del proyecto ({projPlants.length})</p>
+                {projPlants.length===0
+                  ? <p style={{color:C.textLight,fontFamily:font.body,fontSize:"13px",fontStyle:"italic"}}>No hay plantas asignadas aún.</p>
+                  : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:"10px",marginBottom:"20px"}}>
+                      {projPlants.map(p=>(
+                        <div key={p.id} style={{background:C.bg,border:`0.5px solid ${C.border}`,borderRadius:"10px",overflow:"hidden"}}>
+                          <div style={{height:"80px",background:C.greenPale,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                            {p.photo?<img src={p.photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt={p.commonName}/>:<span style={{fontSize:"28px",opacity:0.3}}>🌿</span>}
+                          </div>
+                          <div style={{padding:"6px 8px"}}>
+                            <p style={{margin:0,color:C.text,fontFamily:font.body,fontSize:"11px",fontWeight:500,lineHeight:1.3}}>{p.commonName||"Sin nombre"}</p>
+                            {p.scientificName&&<p style={{margin:0,color:C.textLight,fontFamily:font.body,fontSize:"10px",fontStyle:"italic"}}>{p.scientificName}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                }
+
+                <div style={{display:"flex",gap:"8px"}}>
+                  <button onClick={()=>{setEditingProject(proj);setSelectedProject(null);setShowForm(true);}} style={{flex:1,padding:"10px",background:C.green,color:"#fff",border:"none",borderRadius:"10px",fontFamily:font.body,fontSize:"14px",cursor:"pointer"}}>✏️ Editar</button>
+                  <button onClick={()=>handleDelete(proj.id)} style={{padding:"10px 14px",background:"#f8ece8",color:"#a05050",border:`0.5px solid #d4b8b8`,borderRadius:"10px",fontFamily:font.body,fontSize:"14px",cursor:"pointer"}}>🗑</button>
+                  <button onClick={()=>setSelectedProject(null)} style={{padding:"10px 14px",background:C.bg,color:C.textMid,border:`0.5px solid ${C.border}`,borderRadius:"10px",fontFamily:font.body,fontSize:"14px",cursor:"pointer"}}>Cerrar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {showForm&&<ProjectForm initial={editingProject} myPlants={myPlants} onSave={handleSave} onCancel={()=>{setShowForm(false);setEditingProject(null);}}/>}
+    </div>
+  );
+}
+
 // ── Main App ───────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(null);
@@ -785,7 +1039,7 @@ export default function App() {
               </div>
             </div>
             <div style={{display:"flex",gap:"4px"}}>
-              {[["myplants","🌿 Mi biblioteca"],["community","🌍 Comunidad"],["glossary","📖 Glosario botánico"]].map(([v,label])=>(
+              {[["myplants","🌿 Mi biblioteca"],["community","🌍 Comunidad"],["projects","📋 Proyectos"],["glossary","📖 Glosario botánico"]].map(([v,label])=>(
                 <button key={v} onClick={()=>{ if(v==="glossary"){ setShowGlossary(true); } else setView(v); }} style={{padding:"9px 16px",background:view===v&&v!=="glossary"?"rgba(255,255,255,0.1)":"transparent",color:view===v&&v!=="glossary"?"#d4e8c2":"#7aaa50",border:"none",borderRadius:"8px 8px 0 0",fontFamily:font.body,fontSize:"13px",cursor:"pointer",borderBottom:view===v&&v!=="glossary"?`2px solid ${C.greenLight}`:"2px solid transparent"}}>
                   {label}
                 </button>
@@ -835,6 +1089,7 @@ export default function App() {
           </>
         )}
         {view==="community"&&<CommunityView currentUser={user} onCopy={handleCopy}/>}
+        {view==="projects"&&<ProjectsView user={user} myPlants={plants} showToast={showToast}/>}
       </div>
 
       {selectedPlant&&<DetailModal plant={selectedPlant} onClose={()=>setSelectedPlant(null)} onEdit={p=>{setEditingPlant(p);setSelectedPlant(null);setShowForm(true);}} onDelete={handleDelete} onCopy={handleCopy} isOwn={selectedPlant.userId===user?.uid}/>}
