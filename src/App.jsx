@@ -60,7 +60,31 @@ const GLOSSARY_LEAVES_SHAPES = [
   { value:"abanico",    label:"Abanico",    description:"Hoja en forma de abanico, con nervios que se abren radialmente desde la base." },
   { value:"aguja",      label:"Aguja",      description:"Hoja muy delgada y rígida, típica de coníferas como el pino." },
 ];
+function useFeature(featureId, user) {
+  const [access, setAccess] = useState("loading");
 
+  useEffect(() => {
+    if (!user) { setAccess("denied"); return; }
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "featureFlags", featureId));
+        if (!snap.exists()) { setAccess("denied"); return; }
+        const { allowedUids = [], requiredPlan, enabled } = snap.data();
+        if (!enabled) { setAccess("denied"); return; }
+        if (allowedUids.includes(user.uid)) { setAccess("granted"); return; }
+        if (requiredPlan) {
+          const userSnap = await getDoc(doc(db, "users", user.uid));
+          const plan = userSnap.data()?.plan || "free";
+          setAccess(plan === requiredPlan || plan === "enterprise" ? "granted" : "upgrade");
+          return;
+        }
+        setAccess("denied");
+      } catch(e) { setAccess("denied"); }
+    })();
+  }, [featureId, user?.uid]);
+
+  return access;
+}
 const emptyForm = {
   commonName:"", scientificName:"", origin:"",
   photo:"", photoFlower:"", photoFruit:"", photoLeaf:"",
