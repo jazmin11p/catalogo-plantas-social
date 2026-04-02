@@ -2,6 +2,32 @@ import { useState, useEffect, useRef } from "react";
 import { auth, provider, db } from "./firebase";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, where, serverTimestamp } from "firebase/firestore";
+import PlantCanvas from "./PlantCanvas";
+
+// ── Feature flag hook ──────────────────────────────────
+function useFeature(featureId, user) {
+  const [access, setAccess] = useState("loading");
+  useEffect(() => {
+    if (!user) { setAccess("denied"); return; }
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "featureFlags", featureId));
+        if (!snap.exists()) { setAccess("denied"); return; }
+        const { allowedUids = [], requiredPlan, enabled } = snap.data();
+        if (!enabled) { setAccess("denied"); return; }
+        if (allowedUids.includes(user.uid)) { setAccess("granted"); return; }
+        if (requiredPlan) {
+          const userSnap = await getDoc(doc(db, "users", user.uid));
+          const plan = userSnap.data()?.plan || "free";
+          setAccess(plan === requiredPlan || plan === "enterprise" ? "granted" : "upgrade");
+          return;
+        }
+        setAccess("denied");
+      } catch(e) { setAccess("denied"); }
+    })();
+  }, [featureId, user?.uid]);
+  return access;
+}
 
 // ── Constants ──────────────────────────────────────────
 const LIGHT_OPTIONS = ["Pleno sol","Sol parcial","Sombra","Sombra parcial"];
@@ -60,31 +86,7 @@ const GLOSSARY_LEAVES_SHAPES = [
   { value:"abanico",    label:"Abanico",    description:"Hoja en forma de abanico, con nervios que se abren radialmente desde la base." },
   { value:"aguja",      label:"Aguja",      description:"Hoja muy delgada y rígida, típica de coníferas como el pino." },
 ];
-function useFeature(featureId, user) {
-  const [access, setAccess] = useState("loading");
 
-  useEffect(() => {
-    if (!user) { setAccess("denied"); return; }
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, "featureFlags", featureId));
-        if (!snap.exists()) { setAccess("denied"); return; }
-        const { allowedUids = [], requiredPlan, enabled } = snap.data();
-        if (!enabled) { setAccess("denied"); return; }
-        if (allowedUids.includes(user.uid)) { setAccess("granted"); return; }
-        if (requiredPlan) {
-          const userSnap = await getDoc(doc(db, "users", user.uid));
-          const plan = userSnap.data()?.plan || "free";
-          setAccess(plan === requiredPlan || plan === "enterprise" ? "granted" : "upgrade");
-          return;
-        }
-        setAccess("denied");
-      } catch(e) { setAccess("denied"); }
-    })();
-  }, [featureId, user?.uid]);
-
-  return access;
-}
 const emptyForm = {
   commonName:"", scientificName:"", origin:"",
   photo:"", photoFlower:"", photoFruit:"", photoLeaf:"",
@@ -845,6 +847,8 @@ function ProjectsView({ user, myPlants, showToast }) {
   const [showForm, setShowForm] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [canvasProject, setCanvasProject] = useState(null);
+  const canvasAccess = useFeature("canvas", user);
 
   const loadProjects = async () => {
     try {
@@ -983,6 +987,12 @@ function ProjectsView({ user, myPlants, showToast }) {
                 }
 
                 <div style={{display:"flex",gap:"8px"}}>
+                  {canvasAccess==="granted"&&(
+                    <button onClick={()=>{setCanvasProject(proj);setSelectedProject(null);}} style={{flex:1,padding:"10px",background:C.bgDeep,color:"#d4e8c2",border:"none",borderRadius:"10px",fontFamily:font.body,fontSize:"14px",cursor:"pointer"}}>📐 Canvas</button>
+                  )}
+                  {canvasAccess==="upgrade"&&(
+                    <button disabled style={{flex:1,padding:"10px",background:C.bg,color:C.textLight,border:`0.5px solid ${C.border}`,borderRadius:"10px",fontFamily:font.body,fontSize:"14px",cursor:"not-allowed",opacity:0.7}}>📐 Canvas · Pro</button>
+                  )}
                   <button onClick={()=>{setEditingProject(proj);setSelectedProject(null);setShowForm(true);}} style={{flex:1,padding:"10px",background:C.green,color:"#fff",border:"none",borderRadius:"10px",fontFamily:font.body,fontSize:"14px",cursor:"pointer"}}>✏️ Editar</button>
                   <button onClick={()=>handleDelete(proj.id)} style={{padding:"10px 14px",background:"#f8ece8",color:"#a05050",border:`0.5px solid #d4b8b8`,borderRadius:"10px",fontFamily:font.body,fontSize:"14px",cursor:"pointer"}}>🗑</button>
                   <button onClick={()=>setSelectedProject(null)} style={{padding:"10px 14px",background:C.bg,color:C.textMid,border:`0.5px solid ${C.border}`,borderRadius:"10px",fontFamily:font.body,fontSize:"14px",cursor:"pointer"}}>Cerrar</button>
@@ -994,6 +1004,7 @@ function ProjectsView({ user, myPlants, showToast }) {
       })()}
 
       {showForm&&<ProjectForm initial={editingProject} myPlants={myPlants} onSave={handleSave} onCancel={()=>{setShowForm(false);setEditingProject(null);}}/>}
+      {canvasProject&&<PlantCanvas project={canvasProject} plants={myPlants} onClose={()=>setCanvasProject(null)}/>}
     </div>
   );
 }
