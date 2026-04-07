@@ -1131,6 +1131,6 @@ export default function App() {
       {showForm&&<PlantForm initial={editingPlant} allTags={customTags} onSave={handleSave} onCancel={()=>{setShowForm(false);setEditingPlant(null);}}/>}
       {showTagManager&&<ManageTagsPanel tags={customTags} onSave={handleSaveTags} onClose={()=>setShowTagManager(false)}/>}
       {showGlossary&&<GlossaryPanel onClose={()=>setShowGlossary(false)}/>}
-    </>
+    </> 
   );
 }
